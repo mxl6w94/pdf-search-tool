@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collaborative PDF Page Finder</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- PDF.js for rendering PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js`;
+    </script>
+    
+    <!-- PDF-Lib for creating new PDFs -->
+    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9; /* slate-100 */
+        }
+        .page-canvas {
+            border: 1px solid #cbd5e1; /* slate-300 */
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .page-wrapper {
+            position: relative;
+            padding-top: 1.5rem;
+        }
+        .remove-page-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+        }
+        /* Custom styles for notifications and modals */
+        #notification-container {
+            position: fixed;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .notification {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            transform: translateX(120%);
+            transition: transform 0.3s ease-in-out;
+        }
+        .notification.show {
+            transform: translateX(0);
+        }
+        .notification.success { background-color: #16a34a; /* green-600 */ }
+        .notification.error { background-color: #dc2626; /* red-600 */ }
+    </style>
+</head>
+<body class="text-slate-800">
+    <!-- Main Application Container -->
+    <div class="container mx-auto p-4 md:p-8 max-w-4xl">
+
+        <header class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h1 class="text-3xl font-bold text-slate-700">Collaborative PDF Page Finder</h1>
+            <p class="text-slate-500 mt-1">Find pages and manage shared search groups in real-time.</p>
+        </header>
+
+        <!-- Control Panel -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <!-- 1. PDF File Input -->
+            <div class="mb-6">
+                <label class="block text-lg font-semibold text-slate-600 mb-2">1. Open a PDF File</label>
+                <input type="file" id="file-input" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept="application/pdf">
+                <div id="file-info" class="mt-2 text-sm text-slate-600">No file selected.</div>
+            </div>
+
+            <!-- 2. Search Terms Input -->
+            <div class="mb-4">
+                <label for="search-terms-input" class="block text-lg font-semibold text-slate-600 mb-2">2. Enter Search Terms</label>
+                <textarea id="search-terms-input" rows="3" class="w-full p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="e.g. P.001, P.002, PIPE LEGEND"></textarea>
+                <p class="text-xs text-slate-500 mt-1">Separate each search term with a comma.</p>
+            </div>
+            
+            <!-- 3. Collaborative Search Groups -->
+            <div class="border-t border-slate-200 pt-4 mt-6">
+                 <label class="block text-lg font-semibold text-slate-600 mb-2">3. Manage Shared Search Groups</label>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div>
+                           <label for="search-groups-dropdown" class="text-sm font-medium text-slate-600">Load a saved group:</label>
+                           <div class="flex items-center space-x-2 mt-1">
+                               <select id="search-groups-dropdown" class="w-full p-2 border border-slate-300 rounded-md bg-white"></select>
+                               <button id="load-group-btn" title="Load Selected Group" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">
+                                   <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75 12 3m0 0 3.75 3.75M12 3v18" /></svg>
+                               </button>
+                               <button id="delete-group-btn" title="Delete Selected Group" class="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                           </div>
+                       </div>
+                       <div>
+                           <label for="new-group-name" class="text-sm font-medium text-slate-600">Save current search as a group:</label>
+                           <div class="flex items-center space-x-2 mt-1">
+                               <input type="text" id="new-group-name" placeholder="Group Name" class="w-full p-2 border border-slate-300 rounded-md">
+                               <button id="save-group-btn" title="Save Current Terms" class="p-2 bg-green-500 hover:bg-green-600 text-white rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg></button>
+                           </div>
+                       </div>
+                 </div>
+            </div>
+
+            <!-- 4. Run Search -->
+            <div class="mt-6 border-t pt-6">
+                <button id="run-search-btn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center justify-center text-lg disabled:bg-slate-400 disabled:cursor-not-allowed">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    Find Pages
+                </button>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-container" class="bg-white p-6 rounded-lg shadow-md">
+             <div class="flex justify-between items-center border-b pb-3 mb-4">
+                   <h2 class="text-2xl font-bold text-slate-700">Results</h2>
+                   <button id="open-pdf-btn" class="hidden bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300 flex items-center">
+                       <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                       Open Filtered PDF
+                   </button>
+             </div>
+              <div id="results-summary"></div>
+              <!-- Page Adders -->
+              <div id="page-adders-container" class="hidden mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-600 mb-2">Add a Range</h3>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" id="range-start-input" placeholder="Start" class="w-full p-2 border border-slate-300 rounded-md">
+                        <span class="text-slate-500 font-bold">-</span>
+                        <input type="number" id="range-end-input" placeholder="End" class="w-full p-2 border border-slate-300 rounded-md">
+                        <button id="add-range-btn" class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold px-4">Add</button>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-slate-600 mb-2">Add a Page</h3>
+                    <div class="flex items-center space-x-2">
+                        <input type="number" id="add-page-input" placeholder="Page #" class="w-full p-2 border border-slate-300 rounded-md">
+                        <button id="add-page-btn" class="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md font-semibold px-4">Add</button>
+                    </div>
+                </div>
+              </div>
+             <div id="results-output" class="text-slate-500 mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <p class="w-full px-2 col-span-full">Search results will appear here.</p>
+             </div>
+        </div>
+    </div>
+    
+    <!-- UI Overlays: Loading, Confirmation, Notifications -->
+    <div id="loading-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white p-5 rounded-lg flex items-center shadow-xl">
+            <svg class="w-8 h-8 animate-spin text-blue-600 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <span id="loading-text" class="text-lg font-medium text-gray-700">Searching...</span>
+        </div>
+    </div>
+
+    <div id="notification-container"></div>
+
+    <div id="confirmation-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 id="confirmation-title" class="text-lg font-bold text-slate-800 mb-4">Are you sure?</h3>
+            <div class="flex justify-end space-x-3">
+                <button id="confirm-btn-no" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">No</button>
+                <button id="confirm-btn-yes" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md font-semibold">Yes</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Application Logic -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- DOM Element References ---
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const searchTermsInput = document.getElementById('search-terms-input');
+        const runSearchBtn = document.getElementById('run-search-btn');
+        const resultsSummary = document.getElementById('results-summary');
+        const resultsOutput = document.getElementById('results-output');
+        const openPdfBtn = document.getElementById('open-pdf-btn');
+        const loadingModal = document.getElementById('loading-modal');
+        const loadingText = document.getElementById('loading-text');
+        const searchGroupsDropdown = document.getElementById('search-groups-dropdown');
+        const newGroupNameInput = document.getElementById('new-group-name');
+        const saveGroupBtn = document.getElementById('save-group-btn');
+        const loadGroupBtn = document.getElementById('load-group-btn');
+        const deleteGroupBtn = document.getElementById('delete-group-btn');
+        const pageAddersContainer = document.getElementById('page-adders-container');
+        const rangeStartInput = document.getElementById('range-start-input');
+        const rangeEndInput = document.getElementById('range-end-input');
+        const addRangeBtn = document.getElementById('add-range-btn');
+        const addPageInput = document.getElementById('add-page-input');
+        const addPageBtn = document.getElementById('add-page-btn');
+        const notificationContainer = document.getElementById('notification-container');
+        const confirmationModal = document.getElementById('confirmation-modal');
+        const confirmationTitle = document.getElementById('confirmation-title');
+        const confirmBtnYes = document.getElementById('confirm-btn-yes');
+        const confirmBtnNo = document.getElementById('confirm-btn-no');
+
+        // --- Application State ---
+        let currentPdf = null;
+        let matchedPageNumbers = [];
+        let searchGroups = []; // Changed to array for Firestore
+        let db, auth, userId;
+        let isAuthReady = false;
+        let groupsCollectionRef;
+
+        // --- Firebase Initialization ---
+        async function initializeFirebase() {
+            try {
+                // These global variables are provided by the environment.
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                // setLogLevel('debug'); // Uncomment for Firestore debugging
+
+                groupsCollectionRef = collection(db, `/artifacts/${appId}/public/data/searchGroups`);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        console.log("Authenticated with UID:", userId);
+                        loadGroupsFromFirestore(); // Start listening for group changes
+                    } else {
+                        console.log("User not signed in.");
+                        isAuthReady = false;
+                    }
+                });
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showNotification("Could not connect to the collaborative service.", "error");
+            }
+        }
+        
+        // --- Core Application Logic ---
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file || file.type !== 'application/pdf') {
+                fileInfo.textContent = 'Please select a valid PDF file.';
+                currentPdf = null;
+                return;
+            }
+            fileInfo.textContent = `File: ${file.name}`;
+            const fileReader = new FileReader();
+            fileReader.onload = async (e) => {
+                setLoading(true, "Loading PDF...");
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    currentPdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                } catch (error) {
+                    console.error("Error loading PDF:", error);
+                    fileInfo.textContent = 'Error: Could not load PDF.';
+                    currentPdf = null;
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fileReader.readAsArrayBuffer(file);
+        }
+
+        async function runSearch() {
+            if (!currentPdf) {
+                showNotification('Please select a PDF file first.', 'error');
+                return;
+            }
+            const termsText = searchTermsInput.value.trim();
+            if (!termsText) {
+                showNotification('Please enter some search terms.', 'error');
+                return;
+            }
+            
+            const searchTerms = termsText.split(',').map(term => term.trim().toLowerCase().replace(/\s+/g, '')).filter(term => term.length > 0);
+            
+            if (searchTerms.length === 0) {
+                showNotification('Please enter valid search terms.', 'error');
+                return;
+            }
+
+            setLoading(true, "Searching PDF...");
+            resultsOutput.innerHTML = ''; 
+            resultsSummary.innerHTML = '';
+            openPdfBtn.classList.add('hidden'); 
+            pageAddersContainer.classList.add('hidden'); 
+            const matchedPages = new Set(); 
+
+            for (let i = 1; i <= currentPdf.numPages; i++) {
+                setLoading(true, `Searching page ${i} of ${currentPdf.numPages}...`);
+                const page = await currentPdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join('').toLowerCase().replace(/\s+/g, '');
+
+                const isMatch = searchTerms.some(term => pageText.includes(term));
+                if (isMatch) {
+                    matchedPages.add(page.pageNumber); 
+                }
+            }
+
+            matchedPageNumbers = Array.from(matchedPages).sort((a,b) => a-b);
+            await rerenderAllResults();
+            updateResultsSummary();
+            setLoading(false);
+        }
+        
+        async function openFilteredPdfInNewTab() {
+            if (!fileInput.files[0] || matchedPageNumbers.length === 0) {
+                showNotification("No file or pages to open.", "error");
+                return;
+            }
+            
+            setLoading(true, "Creating new PDF...");
+            try {
+                const originalPdfBytes = await fileInput.files[0].arrayBuffer();
+                const { PDFDocument } = PDFLib; 
+                const pdfDoc = await PDFDocument.load(originalPdfBytes);
+                const newPdfDoc = await PDFDocument.create();
+
+                const pageIndices = matchedPageNumbers.map(n => n - 1).sort((a, b) => a - b);
+                const copiedPages = await newPdfDoc.copyPages(pdfDoc, pageIndices);
+                copiedPages.forEach(page => newPdfDoc.addPage(page));
+
+                const newPdfBytes = await newPdfDoc.save();
+                const blob = new Blob([newPdfBytes], { type: 'application/pdf' });
+                const blobUrl = URL.createObjectURL(blob);
+                window.open(blobUrl, '_blank');
+            } catch (error) {
+                console.error("Error creating filtered PDF:", error);
+                showNotification("Error creating PDF. Check console.", "error");
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        // --- UI Rendering Functions ---
+
+        async function renderPage(page, container) {
+            const pageNum = page.pageNumber;
+            const wrapper = document.createElement('div');
+            wrapper.className = 'page-wrapper mb-6 w-full';
+            wrapper.id = `page-wrapper-${pageNum}`;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.innerHTML = '&times;';
+            removeBtn.className = 'remove-page-btn bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold hover:bg-red-700 transition-colors z-10';
+            removeBtn.title = `Remove page ${pageNum}`;
+            removeBtn.onclick = () => removePage(pageNum);
+            
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            const containerWidth = container.clientWidth > 0 ? container.clientWidth : 300;
+            const scale = (containerWidth / unscaledViewport.width); 
+            const viewport = page.getViewport({ scale: scale });
+
+            const canvas = document.createElement('canvas');
+            canvas.className = 'page-canvas mx-auto'; 
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            const pageTitle = document.createElement('p');
+            pageTitle.className = 'text-sm font-bold text-center text-slate-600 mb-1';
+            pageTitle.textContent = `Page ${pageNum}`;
+             
+            wrapper.appendChild(removeBtn); 
+            wrapper.appendChild(pageTitle); 
+            wrapper.appendChild(canvas);
+            container.appendChild(wrapper);
+
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+        }
+
+        async function rerenderAllResults() {
+            resultsOutput.innerHTML = '<p class="w-full px-2 col-span-full">Loading page previews...</p>'; 
+            if (matchedPageNumbers.length > 0) {
+                resultsOutput.innerHTML = '';
+                 for (const pageNum of matchedPageNumbers) {
+                     const page = await currentPdf.getPage(pageNum);
+                     await renderPage(page, resultsOutput);
+                 }
+            } else {
+                 resultsOutput.innerHTML = '<p class="w-full px-2 col-span-full">No pages found or all pages have been removed.</p>';
+            }
+        }
+
+        function removePage(pageNum) {
+            const wrapperToRemove = document.getElementById(`page-wrapper-${pageNum}`);
+            if (wrapperToRemove) wrapperToRemove.remove();
+            matchedPageNumbers = matchedPageNumbers.filter(num => num !== pageNum);
+            updateResultsSummary();
+        }
+
+        function updateResultsSummary() {
+            if (matchedPageNumbers.length > 0) {
+                 const pageNumbersList = matchedPageNumbers.sort((a, b) => a - b);
+                 resultsSummary.innerHTML = `<p class="mb-2 font-semibold">${matchedPageNumbers.length} selected page(s).</p><div class="mb-2 text-sm text-slate-600 break-words">Pages: <strong>${pageNumbersList.join(', ')}</strong></div>`;
+                 openPdfBtn.classList.remove('hidden');
+                 pageAddersContainer.classList.remove('hidden'); 
+            } else {
+                 resultsSummary.innerHTML = '';
+                 openPdfBtn.classList.add('hidden');
+                 pageAddersContainer.classList.add('hidden');
+                 resultsOutput.innerHTML = '<p class="w-full px-2 col-span-full">No pages found or all pages have been removed.</p>';
+            }
+        }
+        
+        // --- Page Adding Functions ---
+
+        async function handleAddRange() {
+            if (!currentPdf) return showNotification("Please load a PDF first.", "error");
+            const start = parseInt(rangeStartInput.value, 10);
+            const end = parseInt(rangeEndInput.value, 10);
+
+            if (isNaN(start) || isNaN(end) || start > end) return showNotification("Invalid page range.", "error");
+            if (start < 1 || end > currentPdf.numPages) return showNotification(`Pages must be between 1 and ${currentPdf.numPages}.`, "error");
+
+            setLoading(true, "Adding page range...");
+            const pagesToInclude = new Set(matchedPageNumbers);
+            for (let i = start; i <= end; i++) pagesToInclude.add(i);
+            matchedPageNumbers = Array.from(pagesToInclude).sort((a, b) => a - b);
+            
+            await rerenderAllResults();
+            updateResultsSummary();
+            rangeStartInput.value = '';
+            rangeEndInput.value = '';
+            setLoading(false);
+        }
+        
+        async function handleAddSinglePage() {
+            if (!currentPdf) return showNotification("Please load a PDF first.", "error");
+            const pageNum = parseInt(addPageInput.value, 10);
+
+            if (isNaN(pageNum)) return showNotification("Please enter a valid page number.", "error");
+            if (pageNum < 1 || pageNum > currentPdf.numPages) return showNotification(`Page must be between 1 and ${currentPdf.numPages}.`, "error");
+
+            setLoading(true, `Adding page ${pageNum}...`);
+            const pagesToInclude = new Set(matchedPageNumbers);
+            pagesToInclude.add(pageNum);
+            matchedPageNumbers = Array.from(pagesToInclude).sort((a, b) => a - b);
+            
+            await rerenderAllResults();
+            updateResultsSummary();
+            addPageInput.value = '';
+            setLoading(false);
+        }
+
+        // --- Search Group Functions (Firestore) ---
+
+        function loadGroupsFromFirestore() {
+            if (!isAuthReady) return;
+            onSnapshot(groupsCollectionRef, (snapshot) => {
+                searchGroups = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                renderSearchGroupsDropdown();
+            }, (error) => {
+                console.error("Error listening to group changes: ", error);
+                showNotification("Could not load shared groups.", "error");
+            });
+        }
+
+        async function saveSearchGroup() {
+            if (!isAuthReady) return showNotification("Not connected to collaborative service.", "error");
+            const name = newGroupNameInput.value.trim();
+            const terms = searchTermsInput.value.trim();
+            if (!name) return showNotification("Please enter a name for the group.", "error");
+            if (!terms) return showNotification("Please enter search terms to save.", "error");
+
+            try {
+                await addDoc(groupsCollectionRef, { name, terms });
+                newGroupNameInput.value = '';
+                showNotification(`Group "${name}" saved.`, "success");
+            } catch (error) {
+                console.error("Error saving group:", error);
+                showNotification("Could not save group.", "error");
+            }
+        }
+
+        function loadSearchGroup() {
+            const selectedId = searchGroupsDropdown.value;
+            const selectedGroup = searchGroups.find(g => g.id === selectedId);
+            if (selectedGroup) {
+                searchTermsInput.value = selectedGroup.terms;
+            }
+        }
+
+        async function deleteSearchGroup() {
+            if (!isAuthReady) return showNotification("Not connected to collaborative service.", "error");
+            const selectedId = searchGroupsDropdown.value;
+            if (!selectedId) return;
+
+            const selectedGroup = searchGroups.find(g => g.id === selectedId);
+
+            showConfirmation(`Delete the group "${selectedGroup.name}"?`, async () => {
+                try {
+                    const docRef = doc(db, `/artifacts/${__app_id}/public/data/searchGroups/${selectedId}`);
+                    await deleteDoc(docRef);
+                    showNotification(`Group "${selectedGroup.name}" deleted.`, "success");
+                } catch (error) {
+                    console.error("Error deleting group: ", error);
+                    showNotification("Could not delete group.", "error");
+                }
+            });
+        }
+        
+        function renderSearchGroupsDropdown() {
+            const selectedValue = searchGroupsDropdown.value;
+            searchGroupsDropdown.innerHTML = '<option value="">-- Select a Group --</option>';
+            // Sort groups alphabetically by name
+            const sortedGroups = [...searchGroups].sort((a, b) => a.name.localeCompare(b.name));
+            for (const group of sortedGroups) {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                searchGroupsDropdown.appendChild(option);
+            }
+            searchGroupsDropdown.value = selectedValue;
+        }
+
+        // --- Utility Functions (UI Helpers) ---
+        function setLoading(isLoading, text = "Loading...") {
+            loadingText.textContent = text;
+            loadingModal.classList.toggle('hidden', !isLoading);
+        }
+
+        function showNotification(message, type = 'success') {
+            const notif = document.createElement('div');
+            notif.className = `notification ${type}`;
+            notif.textContent = message;
+            notificationContainer.appendChild(notif);
+
+            setTimeout(() => notif.classList.add('show'), 10); // Animate in
+            setTimeout(() => {
+                notif.classList.remove('show');
+                notif.addEventListener('transitionend', () => notif.remove());
+            }, 3000); // Animate out after 3 seconds
+        }
+
+        function showConfirmation(message, onConfirm) {
+            confirmationTitle.textContent = message;
+            confirmationModal.classList.remove('hidden');
+
+            const confirmHandler = () => {
+                onConfirm();
+                cleanup();
+            };
+
+            const cancelHandler = () => {
+                cleanup();
+            };
+            
+            function cleanup() {
+                confirmationModal.classList.add('hidden');
+                confirmBtnYes.removeEventListener('click', confirmHandler);
+                confirmBtnNo.removeEventListener('click', cancelHandler);
+            }
+
+            confirmBtnYes.addEventListener('click', confirmHandler, { once: true });
+            confirmBtnNo.addEventListener('click', cancelHandler, { once: true });
+        }
+
+
+        // --- Initial Application Setup ---
+        function init() {
+            runSearchBtn.disabled = true; 
+            fileInput.addEventListener('change', () => {
+                runSearchBtn.disabled = !fileInput.files[0];
+            });
+
+            // Add all other event listeners
+            saveGroupBtn.addEventListener('click', saveSearchGroup);
+            loadGroupBtn.addEventListener('click', loadSearchGroup);
+            deleteGroupBtn.addEventListener('click', deleteSearchGroup);
+            addRangeBtn.addEventListener('click', handleAddRange);
+            addPageBtn.addEventListener('click', handleAddSinglePage);
+
+            initializeFirebase();
+        }
+
+        init(); 
+    </script>
+</body>
+</html>

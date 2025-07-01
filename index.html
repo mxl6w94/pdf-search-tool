@@ -182,8 +182,8 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- DOM Element References ---
         const fileInput = document.getElementById('file-input');
@@ -215,86 +215,84 @@
         // --- Application State ---
         let currentPdf = null;
         let matchedPageNumbers = [];
-        let searchGroups = []; // Changed to array for Firestore
+        let searchGroups = [];
         let db, auth, userId;
         let isAuthReady = false;
         let groupsCollectionRef;
+        const appId = 'pdf-search-tool-v1'; // Static App ID for the live site
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
-    try {
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-          apiKey: "AIzaSyBu50nNfswe73_JC96yB2wYPqiB1jqR1vw",
-          authDomain: "pdf-search-tool-live.firebaseapp.com",
-          projectId: "pdf-search-tool-live",
-          storageBucket: "pdf-search-tool-live.appspot.com",
-          messagingSenderId: "976932655448",
-          appId: "1:976932655448:web:f7fe06ecc9aa3d1c5f552d",
-          measurementId: "G-W9GPTLHY9V"
-        };
+            try {
+                const firebaseConfig = {
+                    apiKey: "AIzaSyBu50nNfswe73_JC96yB2wYPqiB1jqR1vw",
+                    authDomain: "pdf-search-tool-live.firebaseapp.com",
+                    projectId: "pdf-search-tool-live",
+                    storageBucket: "pdf-search-tool-live.appspot.com",
+                    messagingSenderId: "976932655448",
+                    appId: "1:976932655448:web:f7fe06ecc9aa3d1c5f552d",
+                    measurementId: "G-W9GPTLHY9V"
+                };
 
-        // This can be any unique string for your app
-        const appId = 'pdf-search-tool-v1'; 
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                groupsCollectionRef = collection(db, `/artifacts/${appId}/public/data/searchGroups`);
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
-        
-        groupsCollectionRef = collection(db, `/artifacts/${appId}/public/data/searchGroups`);
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        isAuthReady = true;
+                        console.log("Authenticated with UID:", userId);
+                        loadGroupsFromFirestore();
+                    } else {
+                        console.log("User not signed in.");
+                        isAuthReady = false;
+                    }
+                });
 
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userId = user.uid;
-                isAuthReady = true;
-                console.log("Authenticated with UID:", userId);
-                loadGroupsFromFirestore(); // Start listening for group changes
-            } else {
-                console.log("User not signed in.");
-                isAuthReady = false;
+                await signInAnonymously(auth);
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                showNotification("Could not connect to the collaborative service.", "error");
             }
-        });
-
-        // Sign in anonymously for the live site
-        await signInAnonymously(auth);
-
-    } catch (error) {
-        console.error("Firebase initialization failed:", error);
-        showNotification("Could not connect to the collaborative service.", "error");
-    }
-}
+        }
         
         // --- Core Application Logic ---
 
         async function handleFileSelect(event) {
-    const file = event.target.files[0];
-    runSearchBtn.disabled = true; // Disable button until file is loaded
-    if (!file || file.type !== 'application/pdf') {
-        fileInfo.textContent = 'Please select a valid PDF file.';
-        currentPdf = null;
-        return;
-    }
-    fileInfo.textContent = `File: ${file.name}`;
-    const fileReader = new FileReader();
-    fileReader.onload = async (e) => {
-        setLoading(true, "Loading PDF...");
-        try {
-            const typedarray = new Uint8Array(e.target.result);
-            currentPdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-            runSearchBtn.disabled = false; // Enable button on success
-        } catch (error) {
-            console.error("Error loading PDF:", error);
-            fileInfo.textContent = 'Error: Could not load PDF.';
-            currentPdf = null;
-        } finally {
-            setLoading(false);
+            console.log("handleFileSelect: Fired.");
+            const file = event.target.files[0];
+            runSearchBtn.disabled = true;
+            if (!file || file.type !== 'application/pdf') {
+                fileInfo.textContent = 'Please select a valid PDF file.';
+                currentPdf = null;
+                return;
+            }
+            fileInfo.textContent = `File: ${file.name}`;
+            const fileReader = new FileReader();
+            fileReader.onload = async (e) => {
+                setLoading(true, "Loading PDF...");
+                try {
+                    const typedarray = new Uint8Array(e.target.result);
+                    currentPdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+                    console.log("handleFileSelect: PDF loaded successfully. currentPdf object:", currentPdf);
+                    runSearchBtn.disabled = false;
+                } catch (error) {
+                    console.error("handleFileSelect: Error loading PDF:", error);
+                    fileInfo.textContent = 'Error: Could not load PDF. Check console for details.';
+                    currentPdf = null;
+                } finally {
+                    setLoading(false);
+                }
+            };
+            fileReader.readAsArrayBuffer(file);
         }
-    };
-    fileReader.readAsArrayBuffer(file);
-}
 
         async function runSearch() {
+            console.log("runSearch: Fired. Checking currentPdf:", currentPdf);
             if (!currentPdf) {
                 showNotification('Please select a PDF file first.', 'error');
                 return;
@@ -537,7 +535,6 @@
         function renderSearchGroupsDropdown() {
             const selectedValue = searchGroupsDropdown.value;
             searchGroupsDropdown.innerHTML = '<option value="">-- Select a Group --</option>';
-            // Sort groups alphabetically by name
             const sortedGroups = [...searchGroups].sort((a, b) => a.name.localeCompare(b.name));
             for (const group of sortedGroups) {
                 const option = document.createElement('option');
@@ -560,11 +557,11 @@
             notif.textContent = message;
             notificationContainer.appendChild(notif);
 
-            setTimeout(() => notif.classList.add('show'), 10); // Animate in
+            setTimeout(() => notif.classList.add('show'), 10);
             setTimeout(() => {
                 notif.classList.remove('show');
                 notif.addEventListener('transitionend', () => notif.remove());
-            }, 3000); // Animate out after 3 seconds
+            }, 3000);
         }
 
         function showConfirmation(message, onConfirm) {
@@ -593,19 +590,19 @@
 
         // --- Initial Application Setup ---
         function init() {
-    runSearchBtn.disabled = true; 
-    fileInput.addEventListener('change', handleFileSelect); // This now correctly calls the function above
+            runSearchBtn.disabled = true; 
+            fileInput.addEventListener('change', handleFileSelect);
 
-    // Add all other event listeners
-    saveGroupBtn.addEventListener('click', saveSearchGroup);
-    loadGroupBtn.addEventListener('click', loadSearchGroup);
-    deleteGroupBtn.addEventListener('click', deleteSearchGroup);
-    addRangeBtn.addEventListener('click', handleAddRange);
-    addPageBtn.addEventListener('click', handleAddSinglePage);
-    runSearchBtn.addEventListener('click', runSearch);
+            saveGroupBtn.addEventListener('click', saveSearchGroup);
+            loadGroupBtn.addEventListener('click', loadSearchGroup);
+            deleteGroupBtn.addEventListener('click', deleteSearchGroup);
+            addRangeBtn.addEventListener('click', handleAddRange);
+            addPageBtn.addEventListener('click', handleAddSinglePage);
+            runSearchBtn.addEventListener('click', runSearch);
 
-    initializeFirebase();
-}
+            initializeFirebase();
+        }
+
         init(); 
     </script>
 </body>

@@ -222,40 +222,48 @@
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
-            try {
-                // These global variables are provided by the environment.
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    try {
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyBu50nNfswe73_JC96yB2wYPqiB1jqR1vw",
+          authDomain: "pdf-search-tool-live.firebaseapp.com",
+          projectId: "pdf-search-tool-live",
+          storageBucket: "pdf-search-tool-live.appspot.com",
+          messagingSenderId: "976932655448",
+          appId: "1:976932655448:web:f7fe06ecc9aa3d1c5f552d",
+          measurementId: "G-W9GPTLHY9V"
+        };
 
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-                // setLogLevel('debug'); // Uncomment for Firestore debugging
+        // This can be any unique string for your app
+        const appId = 'pdf-search-tool-v1'; 
 
-                groupsCollectionRef = collection(db, `/artifacts/${appId}/public/data/searchGroups`);
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        groupsCollectionRef = collection(db, `/artifacts/${appId}/public/data/searchGroups`);
 
-                onAuthStateChanged(auth, async (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        isAuthReady = true;
-                        console.log("Authenticated with UID:", userId);
-                        loadGroupsFromFirestore(); // Start listening for group changes
-                    } else {
-                        console.log("User not signed in.");
-                        isAuthReady = false;
-                    }
-                });
-
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Firebase initialization failed:", error);
-                showNotification("Could not connect to the collaborative service.", "error");
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                isAuthReady = true;
+                console.log("Authenticated with UID:", userId);
+                loadGroupsFromFirestore(); // Start listening for group changes
+            } else {
+                console.log("User not signed in.");
+                isAuthReady = false;
             }
-        }
+        });
+
+        // Sign in anonymously for the live site
+        await signInAnonymously(auth);
+
+    } catch (error) {
+        console.error("Firebase initialization failed:", error);
+        showNotification("Could not connect to the collaborative service.", "error");
+    }
+}
         
         // --- Core Application Logic ---
 

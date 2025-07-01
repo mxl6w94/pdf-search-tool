@@ -522,7 +522,7 @@
 
             showConfirmation(`Delete the group "${selectedGroup.name}"?`, async () => {
                 try {
-                    const docRef = doc(db, `/artifacts/${__app_id}/public/data/searchGroups/${selectedId}`);
+                    const docRef = doc(db, `/artifacts/${appId}/public/data/searchGroups/${selectedId}`);
                     await deleteDoc(docRef);
                     showNotification(`Group "${selectedGroup.name}" deleted.`, "success");
                 } catch (error) {

@@ -268,29 +268,31 @@
         // --- Core Application Logic ---
 
         async function handleFileSelect(event) {
-            const file = event.target.files[0];
-            if (!file || file.type !== 'application/pdf') {
-                fileInfo.textContent = 'Please select a valid PDF file.';
-                currentPdf = null;
-                return;
-            }
-            fileInfo.textContent = `File: ${file.name}`;
-            const fileReader = new FileReader();
-            fileReader.onload = async (e) => {
-                setLoading(true, "Loading PDF...");
-                try {
-                    const typedarray = new Uint8Array(e.target.result);
-                    currentPdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
-                } catch (error) {
-                    console.error("Error loading PDF:", error);
-                    fileInfo.textContent = 'Error: Could not load PDF.';
-                    currentPdf = null;
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fileReader.readAsArrayBuffer(file);
+    const file = event.target.files[0];
+    runSearchBtn.disabled = true; // Disable button until file is loaded
+    if (!file || file.type !== 'application/pdf') {
+        fileInfo.textContent = 'Please select a valid PDF file.';
+        currentPdf = null;
+        return;
+    }
+    fileInfo.textContent = `File: ${file.name}`;
+    const fileReader = new FileReader();
+    fileReader.onload = async (e) => {
+        setLoading(true, "Loading PDF...");
+        try {
+            const typedarray = new Uint8Array(e.target.result);
+            currentPdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
+            runSearchBtn.disabled = false; // Enable button on success
+        } catch (error) {
+            console.error("Error loading PDF:", error);
+            fileInfo.textContent = 'Error: Could not load PDF.';
+            currentPdf = null;
+        } finally {
+            setLoading(false);
         }
+    };
+    fileReader.readAsArrayBuffer(file);
+}
 
         async function runSearch() {
             if (!currentPdf) {
@@ -591,22 +593,19 @@
 
         // --- Initial Application Setup ---
         function init() {
-            runSearchBtn.disabled = true; 
-            fileInput.addEventListener('change', () => {
-                runSearchBtn.disabled = !fileInput.files[0];
-            });
+    runSearchBtn.disabled = true; 
+    fileInput.addEventListener('change', handleFileSelect); // This now correctly calls the function above
 
-            // Add all other event listeners
-            runSearchBtn.addEventListener('click', runSearch);
-            saveGroupBtn.addEventListener('click', saveSearchGroup);
-            loadGroupBtn.addEventListener('click', loadSearchGroup);
-            deleteGroupBtn.addEventListener('click', deleteSearchGroup);
-            addRangeBtn.addEventListener('click', handleAddRange);
-            addPageBtn.addEventListener('click', handleAddSinglePage);
+    // Add all other event listeners
+    saveGroupBtn.addEventListener('click', saveSearchGroup);
+    loadGroupBtn.addEventListener('click', loadSearchGroup);
+    deleteGroupBtn.addEventListener('click', deleteSearchGroup);
+    addRangeBtn.addEventListener('click', handleAddRange);
+    addPageBtn.addEventListener('click', handleAddSinglePage);
+    runSearchBtn.addEventListener('click', runSearch);
 
-            initializeFirebase();
-        }
-
+    initializeFirebase();
+}
         init(); 
     </script>
 </body>

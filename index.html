@@ -152,7 +152,7 @@
                     </div>
                 </div>
               </div>
-             <div id="results-output" class="text-slate-500 mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+             <div id="results-output" class="flex overflow-x-auto space-x-6 p-4 bg-slate-50 rounded-lg mt-6">
                   <p class="w-full px-2 col-span-full">Search results will appear here.</p>
              </div>
         </div>
@@ -369,7 +369,7 @@
         async function renderPage(page, container) {
             const pageNum = page.pageNumber;
             const wrapper = document.createElement('div');
-            wrapper.className = 'page-wrapper mb-6 w-full';
+            wrapper.className = 'page-wrapper flex-shrink-0 w-64';
             wrapper.id = `page-wrapper-${pageNum}`;
 
             const removeBtn = document.createElement('button');
@@ -379,7 +379,7 @@
             removeBtn.onclick = () => removePage(pageNum);
             
             const unscaledViewport = page.getViewport({ scale: 1.0 });
-            const containerWidth = container.clientWidth > 0 ? container.clientWidth : 300;
+            const containerWidth = 256; // w-64 is 256px
             const scale = (containerWidth / unscaledViewport.width); 
             const viewport = page.getViewport({ scale: scale });
 
@@ -402,7 +402,7 @@
         }
 
         async function rerenderAllResults() {
-            resultsOutput.innerHTML = '<p class="w-full px-2 col-span-full">Loading page previews...</p>'; 
+            resultsOutput.innerHTML = '<p class="w-full px-2">Loading page previews...</p>'; 
             if (matchedPageNumbers.length > 0) {
                 resultsOutput.innerHTML = '';
                  for (const pageNum of matchedPageNumbers) {
@@ -410,7 +410,7 @@
                      await renderPage(page, resultsOutput);
                  }
             } else {
-                 resultsOutput.innerHTML = '<p class="w-full px-2 col-span-full">No pages found or all pages have been removed.</p>';
+                 resultsOutput.innerHTML = '<p class="w-full px-2">No pages found or all pages have been removed.</p>';
             }
         }
 
@@ -431,7 +431,7 @@
                  resultsSummary.innerHTML = '';
                  openPdfBtn.classList.add('hidden');
                  pageAddersContainer.classList.add('hidden');
-                 resultsOutput.innerHTML = '<p class="w-full px-2 col-span-full">No pages found or all pages have been removed.</p>';
+                 resultsOutput.innerHTML = '<p class="w-full px-2">No pages found or all pages have been removed.</p>';
             }
         }
         

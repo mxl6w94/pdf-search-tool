@@ -63,6 +63,25 @@
         }
         .notification.success { background-color: #16a34a; /* green-600 */ }
         .notification.error { background-color: #dc2626; /* red-600 */ }
+
+        /* Add this to your existing <style> block */
+        #magnifier-popover {
+            position: fixed; /* Positions relative to the browser window. Crucial for floating over everything. */
+            z-index: 200; /* A high z-index ensures it appears on top of other content. */
+            background-color: white;
+            border: 1px solid #94a3b8; /* slate-400 */
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            pointer-events: none; /* This is key! It makes the popover "invisible" to the mouse, so it doesn't block events (like mouseleave) on the thumbnail underneath it. */
+            padding: 0.5rem;
+        }
+
+        #magnifier-popover canvas {
+            display: block; /* Removes any extra space below the canvas inside the popover */
+        }
+
+
+        
     </style>
 </head>
 <body class="text-slate-800">
@@ -372,6 +391,10 @@
             wrapper.className = 'page-wrapper flex-shrink-0 w-64';
             wrapper.id = `page-wrapper-${pageNum}`;
 
+            // Store the page number directly on the element for easy access later.
+            wrapper.dataset.pageNumber = pageNum;
+
+
             const removeBtn = document.createElement('button');
             removeBtn.innerHTML = '&times;';
             removeBtn.className = 'remove-page-btn bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold hover:bg-red-700 transition-colors z-10';
@@ -392,6 +415,10 @@
             const pageTitle = document.createElement('p');
             pageTitle.className = 'text-sm font-bold text-center text-slate-600 mb-1';
             pageTitle.textContent = `Page ${pageNum}`;
+
+             // ADD THESE TWO LINES before the end of the function
+            wrapper.addEventListener('mouseenter', handleMouseEnter);
+            wrapper.addEventListener('mouseleave', handleMouseLeave);
              
             wrapper.appendChild(removeBtn); 
             wrapper.appendChild(pageTitle); 
@@ -602,6 +629,87 @@
             openPdfBtn.addEventListener('click', openFilteredPdfInNewTab);
 
             initializeFirebase();
+        }
+
+
+                // Add these new functions to your JavaScript
+        function handleMouseLeave(event) {
+            // Find and remove the popover if it exists.
+            const popover = document.getElementById('magnifier-popover');
+            if (popover) {
+                popover.remove();
+            }
+        }
+        
+        async function handleMouseEnter(event) {
+            // 1. Get the page number we stored in the dataset
+            const pageNum = parseInt(event.currentTarget.dataset.pageNumber, 10);
+            if (!currentPdf || !pageNum) return;
+        
+            // Remove any old popover just in case
+            handleMouseLeave();
+        
+            // 2. Create the popover container
+            const popover = document.createElement('div');
+            popover.id = 'magnifier-popover';
+            
+            // Create a temporary loading message
+            const loadingMessage = document.createElement('p');
+            loadingMessage.textContent = 'Loading...';
+            loadingMessage.className = 'p-4';
+            popover.appendChild(loadingMessage);
+        
+            // 3. Position the popover initially
+            // We position it first, so it appears instantly, then the high-res render loads into it.
+            positionPopover(event, popover);
+            
+            // Add to the page
+            document.body.appendChild(popover);
+            
+            // 4. Get the PDF page and render it at a higher resolution
+            const page = await currentPdf.getPage(pageNum);
+            
+            // Define a larger size for our magnified view
+            const magnifiedWidth = 500; // pixels
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            const scale = magnifiedWidth / unscaledViewport.width;
+            const viewport = page.getViewport({ scale: scale });
+        
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+        
+            // 5. Render the page, then swap the loading message for the canvas
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+        
+            popover.innerHTML = ''; // Clear the "Loading..." text
+            popover.appendChild(canvas); // Add the high-res canvas
+        
+            // 6. Final re-positioning in case rendering took a moment
+            positionPopover(event, popover);
+        }
+        
+        // UTILITY FUNCTION FOR POSITIONING
+        function positionPopover(mouseEvent, popoverElement) {
+            const popoverRect = popoverElement.getBoundingClientRect();
+            const offsetX = 15; // Offset from the cursor
+            const offsetY = 15;
+        
+            let top = mouseEvent.clientY + offsetY;
+            let left = mouseEvent.clientX + offsetX;
+        
+            // Prevent popover from going off the right edge of the screen
+            if (left + popoverRect.width > window.innerWidth) {
+                left = mouseEvent.clientX - popoverRect.width - offsetX;
+            }
+            // Prevent popover from going off the bottom edge
+            if (top + popoverRect.height > window.innerHeight) {
+                top = mouseEvent.clientY - popoverRect.height - offsetY;
+            }
+        
+            popoverElement.style.top = `${top}px`;
+            popoverElement.style.left = `${left}px`;
         }
 
         init(); 

@@ -84,7 +84,7 @@
         #index-canvas-wrapper {
             display: flex;
             align-items: flex-start; /* Align canvas to the top */
-            justify-content: center;
+            /* justify-content: center; <-- This was causing the scroll issue */
         }
         #index-parser-canvas {
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
@@ -229,11 +229,23 @@
             <!-- Header -->
             <div class="p-4 border-b flex justify-between items-center flex-shrink-0">
                 <h3 class="text-xl font-bold text-slate-800">Select Index Area</h3>
-                <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-4 flex-wrap">
                     <div class="flex items-center space-x-2">
                         <button id="index-prev-page" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">&lt;</button>
                         <span>Page <input type="number" id="index-page-num" class="w-16 text-center border rounded-md p-1"> of <span id="index-page-count">0</span></span>
                         <button id="index-next-page" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">&gt;</button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button id="zoom-out-btn" title="Zoom Out" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM13.5 10.5h-6" /></svg>
+                        </button>
+                        <span id="zoom-display" class="font-mono text-sm text-slate-600 w-12 text-center">100%</span>
+                        <button id="zoom-in-btn" title="Zoom In" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" /></svg>
+                        </button>
+                        <button id="zoom-fit-btn" title="Fit to Width" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">
+                            <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 20.25v-4.5m0 4.5h-4.5m4.5 0L15 15" /></svg>
+                        </button>
                     </div>
                     <button id="parse-selection-btn" class="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-md font-semibold disabled:bg-slate-400" disabled>Parse Selection</button>
                     <button id="cancel-index-parser-btn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">Cancel</button>
@@ -298,6 +310,10 @@
         const parsedIndexContainer = document.getElementById('parsed-index-container');
         const parsedIndexOutput = document.getElementById('parsed-index-output');
         const addSelectedIndexBtn = document.getElementById('add-selected-index-btn');
+        const zoomOutBtn = document.getElementById('zoom-out-btn');
+        const zoomInBtn = document.getElementById('zoom-in-btn');
+        const zoomFitBtn = document.getElementById('zoom-fit-btn');
+        const zoomDisplay = document.getElementById('zoom-display');
 
 
         // --- Application State ---
@@ -319,6 +335,7 @@
             selectionRect: { x: 0, y: 0, w: 0, h: 0 },
             currentRenderedPage: null,
             currentViewport: null,
+            currentScale: 'auto', // 'auto' or a number
         };
 
         // --- Firebase Initialization ---
@@ -663,6 +680,7 @@
             indexParserState.pdf = currentPdf;
             indexParserState.totalPages = currentPdf.numPages;
             indexParserState.currentPageNum = 1;
+            indexParserState.currentScale = 'auto'; // Reset zoom on open
             indexPageCount.textContent = indexParserState.totalPages;
             indexPageNumInput.value = 1;
             indexParserModal.classList.remove('hidden');
@@ -679,14 +697,23 @@
         }
 
         async function renderIndexPage(pageNum) {
+            if (!indexParserState.pdf) return;
             setLoading(true, `Loading page ${pageNum}...`);
             try {
                 const page = await indexParserState.pdf.getPage(pageNum);
                 indexParserState.currentRenderedPage = page;
                 
-                const wrapperWidth = indexCanvasWrapper.clientWidth - 40; // Subtract padding
+                let scale;
                 const unscaledViewport = page.getViewport({ scale: 1.0 });
-                const scale = wrapperWidth / unscaledViewport.width;
+
+                if (indexParserState.currentScale === 'auto') {
+                    const wrapperWidth = indexCanvasWrapper.clientWidth - 40; // Subtract padding
+                    scale = wrapperWidth / unscaledViewport.width;
+                } else {
+                    scale = indexParserState.currentScale;
+                }
+
+                zoomDisplay.textContent = `${Math.round(scale * 100)}%`;
                 const viewport = page.getViewport({ scale: scale });
                 indexParserState.currentViewport = viewport;
 
@@ -760,6 +787,34 @@
                 selectionBox.style.display = 'none';
             }
         }
+
+        function getCurrentScale() {
+            if (indexParserState.currentScale !== 'auto') {
+                return indexParserState.currentScale;
+            }
+            const page = indexParserState.currentRenderedPage;
+            if (!page) return 1.0; 
+            const wrapperWidth = indexCanvasWrapper.clientWidth - 40;
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            return wrapperWidth / unscaledViewport.width;
+        }
+
+        function handleZoomIn() {
+            const currentScale = getCurrentScale();
+            indexParserState.currentScale = currentScale + 0.25;
+            renderIndexPage(indexParserState.currentPageNum);
+        }
+
+        function handleZoomOut() {
+            const currentScale = getCurrentScale();
+            indexParserState.currentScale = Math.max(0.1, currentScale - 0.25);
+            renderIndexPage(indexParserState.currentPageNum);
+        }
+
+        function handleZoomFit() {
+            indexParserState.currentScale = 'auto';
+            renderIndexPage(indexParserState.currentPageNum);
+        }
         
         async function findIndexPages(terms, pageToExclude) {
             if (!currentPdf || terms.length === 0) {
@@ -767,15 +822,21 @@
             }
 
             const foundIndexData = [];
-            const termsToFind = new Map(terms.map(term => [term.toLowerCase().replace(/\s+/g, ''), term]));
+            // The key is the original term. The value is an array of cleaned words.
+            // e.g., "A0.1 COVER" -> ['a0.1', 'cover']
+            const termsToFind = new Map(
+                terms.map(term => {
+                    const cleanedWords = term.toLowerCase().match(/[\w.]+/g) || [];
+                    return [term, cleanedWords];
+                })
+            );
 
             for (let i = 1; i <= currentPdf.numPages; i++) {
                 if (i === pageToExclude) {
-                    continue; // Skip the page that was parsed
+                    continue;
                 }
 
                 if (termsToFind.size === 0) {
-                    console.log("All index terms found, stopping search early.");
                     break;
                 }
 
@@ -783,26 +844,36 @@
 
                 const page = await currentPdf.getPage(i);
                 const textContent = await page.getTextContent();
-                const pageText = textContent.items.map(item => item.str).join('').toLowerCase().replace(/\s+/g, '');
+                // Join with spaces and lowercase once per page.
+                const pageText = textContent.items.map(item => item.str).join(' ').toLowerCase();
 
-                for (const searchTerm of [...termsToFind.keys()]) {
-                    if (pageText.includes(searchTerm)) {
-                        const originalTerm = termsToFind.get(searchTerm);
+                // Iterate over the map of terms we still need to find.
+                for (const [originalTerm, searchWords] of termsToFind.entries()) {
+                    if (searchWords.length === 0) {
+                        termsToFind.delete(originalTerm); // Remove empty terms
+                        continue;
+                    }
+                    
+                    // Check if every search word is present on the page.
+                    const allWordsFound = searchWords.every(word => pageText.includes(word));
+
+                    if (allWordsFound) {
                         foundIndexData.push({ description: originalTerm, pageNum: i });
-                        termsToFind.delete(searchTerm);
+                        termsToFind.delete(originalTerm); // Remove the found term by its original key.
                     }
                 }
             }
 
             if (termsToFind.size > 0) {
                 showNotification(`${termsToFind.size} index terms could not be found in the document.`, 'error');
-                console.log("Unfound terms:", [...termsToFind.values()]);
+                console.log("Unfound terms:", [...termsToFind.keys()]);
             }
 
             foundIndexData.sort((a, b) => terms.indexOf(a.description) - terms.indexOf(b.description));
 
             return foundIndexData;
         }
+
 
         async function parseSelectedText() {
             setLoading(true, "Parsing selection...");
@@ -1062,6 +1133,9 @@
             indexNextPageBtn.addEventListener('click', () => changeIndexPage(1));
             indexPageNumInput.addEventListener('change', goToIndexPage);
             parseSelectionBtn.addEventListener('click', parseSelectedText);
+            zoomInBtn.addEventListener('click', handleZoomIn);
+            zoomOutBtn.addEventListener('click', handleZoomOut);
+            zoomFitBtn.addEventListener('click', handleZoomFit);
             
             // Selection listeners
             indexParserCanvas.parentElement.addEventListener('mousedown', handleSelectionStart);

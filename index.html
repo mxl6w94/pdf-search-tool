@@ -63,6 +63,22 @@
         }
         .notification.success { background-color: #16a34a; /* green-600 */ }
         .notification.error { background-color: #dc2626; /* red-600 */ }
+
+        /* Styles for the magnifier popover */
+        #magnifier-popover {
+            position: fixed; /* Positions relative to the browser window. Crucial for floating over everything. */
+            z-index: 200; /* A high z-index ensures it appears on top of other content. */
+            background-color: white;
+            border: 1px solid #94a3b8; /* slate-400 */
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            pointer-events: none; /* This is key! It makes the popover "invisible" to the mouse, so it doesn't block events (like mouseleave) on the thumbnail underneath it. */
+            padding: 0.5rem;
+        }
+
+        #magnifier-popover canvas {
+            display: block; /* Removes any extra space below the canvas inside the popover */
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -94,23 +110,23 @@
             <div class="border-t border-slate-200 pt-4 mt-6">
                  <label class="block text-lg font-semibold text-slate-600 mb-2">3. Manage Shared Search Groups</label>
                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div>
+                      <div>
                            <label for="search-groups-dropdown" class="text-sm font-medium text-slate-600">Load a saved group:</label>
                            <div class="flex items-center space-x-2 mt-1">
-                               <select id="search-groups-dropdown" class="w-full p-2 border border-slate-300 rounded-md bg-white"></select>
-                               <button id="load-group-btn" title="Load Selected Group" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">
-                                   <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75 12 3m0 0 3.75 3.75M12 3v18" /></svg>
-                               </button>
-                               <button id="delete-group-btn" title="Delete Selected Group" class="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                                <select id="search-groups-dropdown" class="w-full p-2 border border-slate-300 rounded-md bg-white"></select>
+                                <button id="load-group-btn" title="Load Selected Group" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">
+                                     <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75 12 3m0 0 3.75 3.75M12 3v18" /></svg>
+                                </button>
+                                <button id="delete-group-btn" title="Delete Selected Group" class="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                            </div>
-                       </div>
-                       <div>
+                      </div>
+                      <div>
                            <label for="new-group-name" class="text-sm font-medium text-slate-600">Save current search as a group:</label>
                            <div class="flex items-center space-x-2 mt-1">
-                               <input type="text" id="new-group-name" placeholder="Group Name" class="w-full p-2 border border-slate-300 rounded-md">
-                               <button id="save-group-btn" title="Save Current Terms" class="p-2 bg-green-500 hover:bg-green-600 text-white rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg></button>
+                                <input type="text" id="new-group-name" placeholder="Group Name" class="w-full p-2 border border-slate-300 rounded-md">
+                                <button id="save-group-btn" title="Save Current Terms" class="p-2 bg-green-500 hover:bg-green-600 text-white rounded-md"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg></button>
                            </div>
-                       </div>
+                      </div>
                  </div>
             </div>
 
@@ -126,11 +142,11 @@
         <!-- Results Section -->
         <div id="results-container" class="bg-white p-6 rounded-lg shadow-md">
              <div class="flex justify-between items-center border-b pb-3 mb-4">
-                   <h2 class="text-2xl font-bold text-slate-700">Results</h2>
-                   <button id="open-pdf-btn" class="hidden bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300 flex items-center">
-                       <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
-                       Open Filtered PDF
-                   </button>
+                  <h2 class="text-2xl font-bold text-slate-700">Results</h2>
+                  <button id="open-pdf-btn" class="hidden bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition duration-300 flex items-center">
+                      <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                      Open Filtered PDF
+                  </button>
              </div>
               <div id="results-summary"></div>
               <!-- Page Adders -->
@@ -153,7 +169,7 @@
                 </div>
               </div>
              <div id="results-output" class="flex overflow-x-auto space-x-6 p-4 bg-slate-50 rounded-lg mt-6">
-                  <p class="w-full px-2 col-span-full">Search results will appear here.</p>
+                   <p class="w-full px-2 col-span-full">Search results will appear here.</p>
              </div>
         </div>
     </div>
@@ -182,7 +198,7 @@
     <script type="module">
         // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, onSnapshot, addDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- DOM Element References ---
@@ -219,20 +235,22 @@
         let db, auth, userId;
         let isAuthReady = false;
         let groupsCollectionRef;
-        const appId = 'pdf-search-tool-v1'; // Static App ID for the live site
+        // Use environment variable for app ID with a fallback
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pdf-search-tool-v1';
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
             try {
-                const firebaseConfig = {
-                    apiKey: "AIzaSyBu50nNfswe73_JC96yB2wYPqiB1jqR1vw",
-                    authDomain: "pdf-search-tool-live.firebaseapp.com",
-                    projectId: "pdf-search-tool-live",
-                    storageBucket: "pdf-search-tool-live.appspot.com",
-                    messagingSenderId: "976932655448",
-                    appId: "1:976932655448:web:f7fe06ecc9aa3d1c5f552d",
-                    measurementId: "G-W9GPTLHY9V"
-                };
+                // Use environment variable for Firebase config with a fallback
+                const firebaseConfigString = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+                const firebaseConfig = JSON.parse(firebaseConfigString);
+
+                // Check if firebaseConfig is populated
+                if (!firebaseConfig.apiKey) {
+                    console.error("Firebase configuration is missing or invalid.");
+                    showNotification("Collaboration service is not configured.", "error");
+                    return;
+                }
 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
@@ -251,8 +269,13 @@
                         isAuthReady = false;
                     }
                 });
-
-                await signInAnonymously(auth);
+                
+                // Sign in using the provided token or anonymously as a fallback
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
 
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
@@ -372,6 +395,9 @@
             wrapper.className = 'page-wrapper flex-shrink-0 w-64';
             wrapper.id = `page-wrapper-${pageNum}`;
 
+            // Store the page number directly on the element for easy access later.
+            wrapper.dataset.pageNumber = pageNum;
+
             const removeBtn = document.createElement('button');
             removeBtn.innerHTML = '&times;';
             removeBtn.className = 'remove-page-btn bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold hover:bg-red-700 transition-colors z-10';
@@ -392,7 +418,11 @@
             const pageTitle = document.createElement('p');
             pageTitle.className = 'text-sm font-bold text-center text-slate-600 mb-1';
             pageTitle.textContent = `Page ${pageNum}`;
-             
+
+            // Add event listeners for the magnifier popover
+            wrapper.addEventListener('mouseenter', handleMouseEnter);
+            wrapper.addEventListener('mouseleave', handleMouseLeave);
+            
             wrapper.appendChild(removeBtn); 
             wrapper.appendChild(pageTitle); 
             wrapper.appendChild(canvas);
@@ -406,8 +436,8 @@
             if (matchedPageNumbers.length > 0) {
                 resultsOutput.innerHTML = '';
                  for (const pageNum of matchedPageNumbers) {
-                     const page = await currentPdf.getPage(pageNum);
-                     await renderPage(page, resultsOutput);
+                      const page = await currentPdf.getPage(pageNum);
+                      await renderPage(page, resultsOutput);
                  }
             } else {
                  resultsOutput.innerHTML = '<p class="w-full px-2">No pages found or all pages have been removed.</p>';
@@ -587,6 +617,86 @@
             confirmBtnNo.addEventListener('click', cancelHandler, { once: true });
         }
 
+
+        // --- Magnifier Functions ---
+        function handleMouseLeave(event) {
+            // Find and remove the popover if it exists.
+            const popover = document.getElementById('magnifier-popover');
+            if (popover) {
+                popover.remove();
+            }
+        }
+        
+        async function handleMouseEnter(event) {
+            // 1. Get the page number we stored in the dataset
+            const pageNum = parseInt(event.currentTarget.dataset.pageNumber, 10);
+            if (!currentPdf || !pageNum) return;
+        
+            // Remove any old popover just in case
+            handleMouseLeave();
+        
+            // 2. Create the popover container
+            const popover = document.createElement('div');
+            popover.id = 'magnifier-popover';
+            
+            // Create a temporary loading message
+            const loadingMessage = document.createElement('p');
+            loadingMessage.textContent = 'Loading...';
+            loadingMessage.className = 'p-4';
+            popover.appendChild(loadingMessage);
+        
+            // 3. Position the popover initially
+            // We position it first, so it appears instantly, then the high-res render loads into it.
+            positionPopover(event, popover);
+            
+            // Add to the page
+            document.body.appendChild(popover);
+            
+            // 4. Get the PDF page and render it at a higher resolution
+            const page = await currentPdf.getPage(pageNum);
+            
+            // Define a larger size for our magnified view
+            const magnifiedWidth = 500; // pixels
+            const unscaledViewport = page.getViewport({ scale: 1.0 });
+            const scale = magnifiedWidth / unscaledViewport.width;
+            const viewport = page.getViewport({ scale: scale });
+        
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+        
+            // 5. Render the page, then swap the loading message for the canvas
+            await page.render({ canvasContext: context, viewport: viewport }).promise;
+        
+            popover.innerHTML = ''; // Clear the "Loading..." text
+            popover.appendChild(canvas); // Add the high-res canvas
+        
+            // 6. Final re-positioning in case rendering took a moment
+            positionPopover(event, popover);
+        }
+        
+        // UTILITY FUNCTION FOR POSITIONING
+        function positionPopover(mouseEvent, popoverElement) {
+            const popoverRect = popoverElement.getBoundingClientRect();
+            const offsetX = 15; // Offset from the cursor
+            const offsetY = 15;
+        
+            let top = mouseEvent.clientY + offsetY;
+            let left = mouseEvent.clientX + offsetX;
+        
+            // Prevent popover from going off the right edge of the screen
+            if (left + popoverRect.width > window.innerWidth) {
+                left = mouseEvent.clientX - popoverRect.width - offsetX;
+            }
+            // Prevent popover from going off the bottom edge
+            if (top + popoverRect.height > window.innerHeight) {
+                top = mouseEvent.clientY - popoverRect.height - offsetY;
+            }
+        
+            popoverElement.style.top = `${top}px`;
+            popoverElement.style.left = `${left}px`;
+        }
 
         // --- Initial Application Setup ---
         function init() {

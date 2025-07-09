@@ -79,6 +79,18 @@
         #magnifier-popover canvas {
             display: block;
         }
+
+        /* Styles for the Index Parser Modal */
+        #index-canvas-wrapper {
+            display: flex;
+            align-items: flex-start; /* Align canvas to the top */
+            justify-content: center;
+        }
+        #index-parser-canvas {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 1px solid #ccc;
+            cursor: crosshair;
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -97,6 +109,11 @@
                 <label class="block text-lg font-semibold text-slate-600 mb-2">1. Open a PDF File</label>
                 <input type="file" id="file-input" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" accept="application/pdf">
                 <div id="file-info" class="mt-2 text-sm text-slate-600">No file selected.</div>
+                 <div class="mt-4">
+                    <button id="parse-index-btn" class="hidden bg-indigo-500 text-white font-semibold py-2 px-4 rounded-lg hover:bg-indigo-600 transition duration-300 disabled:bg-slate-400 disabled:cursor-not-allowed">
+                        Select & Parse Index
+                    </button>
+                </div>
             </div>
 
             <!-- 2. Search Terms Input -->
@@ -139,6 +156,19 @@
             </div>
         </div>
 
+        <!-- Parsed Index Section (Initially Hidden) -->
+        <div id="parsed-index-container" class="hidden bg-white p-6 rounded-lg shadow-md mb-8">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h2 class="text-2xl font-bold text-slate-700">Parsed Index</h2>
+                <button id="add-selected-index-btn" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition duration-300 flex items-center">
+                    Add Selected to Results
+                </button>
+            </div>
+            <div id="parsed-index-output" class="space-y-2 max-h-96 overflow-y-auto">
+                <p class="text-slate-500">Select an area from the PDF to parse an index.</p>
+            </div>
+        </div>
+
         <!-- Results Section -->
         <div id="results-container" class="bg-white p-6 rounded-lg shadow-md">
              <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -168,13 +198,13 @@
                      </div>
                  </div>
                </div>
-              <div id="results-output" class="flex overflow-x-auto space-x-6 p-4 bg-slate-50 rounded-lg mt-6">
+               <div id="results-output" class="flex overflow-x-auto space-x-6 p-4 bg-slate-50 rounded-lg mt-6">
                    <p class="w-full px-2 col-span-full">Search results will appear here.</p>
-              </div>
+               </div>
         </div>
     </div>
     
-    <!-- UI Overlays: Loading, Confirmation, Notifications -->
+    <!-- UI Overlays: Loading, Confirmation, Notifications, Index Parser -->
     <div id="loading-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50">
         <div class="bg-white p-5 rounded-lg flex items-center shadow-xl">
             <svg class="w-8 h-8 animate-spin text-blue-600 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -190,6 +220,31 @@
             <div class="flex justify-end space-x-3">
                 <button id="confirm-btn-no" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">No</button>
                 <button id="confirm-btn-yes" class="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-md font-semibold">Yes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="index-parser-modal" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex flex-col items-center justify-center z-[60] p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-6xl h-full flex flex-col">
+            <!-- Header -->
+            <div class="p-4 border-b flex justify-between items-center flex-shrink-0">
+                <h3 class="text-xl font-bold text-slate-800">Select Index Area</h3>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <button id="index-prev-page" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">&lt;</button>
+                        <span>Page <input type="number" id="index-page-num" class="w-16 text-center border rounded-md p-1"> of <span id="index-page-count">0</span></span>
+                        <button id="index-next-page" class="p-2 bg-slate-200 hover:bg-slate-300 rounded-md">&gt;</button>
+                    </div>
+                    <button id="parse-selection-btn" class="px-4 py-2 bg-green-600 text-white hover:bg-green-700 rounded-md font-semibold disabled:bg-slate-400" disabled>Parse Selection</button>
+                    <button id="cancel-index-parser-btn" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-md font-semibold">Cancel</button>
+                </div>
+            </div>
+            <!-- Content -->
+            <div id="index-canvas-wrapper" class="flex-grow p-4 overflow-auto bg-slate-100 relative">
+                <div class="relative"> <!-- Added a relative container for canvas and selection box -->
+                    <canvas id="index-parser-canvas"></canvas>
+                    <div id="selection-box" class="absolute border-2 border-dashed border-blue-500 bg-blue-500 bg-opacity-20 pointer-events-none" style="display: none;"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -227,6 +282,23 @@
         const confirmationTitle = document.getElementById('confirmation-title');
         const confirmBtnYes = document.getElementById('confirm-btn-yes');
         const confirmBtnNo = document.getElementById('confirm-btn-no');
+        
+        // Index Parser DOM Elements
+        const parseIndexBtn = document.getElementById('parse-index-btn');
+        const indexParserModal = document.getElementById('index-parser-modal');
+        const indexCanvasWrapper = document.getElementById('index-canvas-wrapper');
+        const indexParserCanvas = document.getElementById('index-parser-canvas');
+        const selectionBox = document.getElementById('selection-box');
+        const indexPrevPageBtn = document.getElementById('index-prev-page');
+        const indexNextPageBtn = document.getElementById('index-next-page');
+        const indexPageNumInput = document.getElementById('index-page-num');
+        const indexPageCount = document.getElementById('index-page-count');
+        const parseSelectionBtn = document.getElementById('parse-selection-btn');
+        const cancelIndexParserBtn = document.getElementById('cancel-index-parser-btn');
+        const parsedIndexContainer = document.getElementById('parsed-index-container');
+        const parsedIndexOutput = document.getElementById('parsed-index-output');
+        const addSelectedIndexBtn = document.getElementById('add-selected-index-btn');
+
 
         // --- Application State ---
         let currentPdf = null;
@@ -236,6 +308,18 @@
         let isAuthReady = false;
         let groupsCollectionRef;
         const appId = 'pdf-search-tool-v1'; // Static App ID for the live site
+
+        // Index Parser State
+        let indexParserState = {
+            pdf: null,
+            currentPageNum: 1,
+            totalPages: 0,
+            isSelecting: false,
+            selectionStart: { x: 0, y: 0 },
+            selectionRect: { x: 0, y: 0, w: 0, h: 0 },
+            currentRenderedPage: null,
+            currentViewport: null,
+        };
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
@@ -283,6 +367,8 @@
             console.log("handleFileSelect: Fired.");
             const file = event.target.files[0];
             runSearchBtn.disabled = true;
+            parseIndexBtn.classList.add('hidden');
+
             if (!file || file.type !== 'application/pdf') {
                 fileInfo.textContent = 'Please select a valid PDF file.';
                 currentPdf = null;
@@ -297,6 +383,7 @@
                     currentPdf = await pdfjsLib.getDocument({ data: typedarray }).promise;
                     console.log("handleFileSelect: PDF loaded successfully. currentPdf object:", currentPdf);
                     runSearchBtn.disabled = false;
+                    parseIndexBtn.classList.remove('hidden');
                 } catch (error) {
                     console.error("handleFileSelect: Error loading PDF:", error);
                     fileInfo.textContent = 'Error: Could not load PDF. Check console for details.';
@@ -569,6 +656,297 @@
             searchGroupsDropdown.value = selectedValue;
         }
 
+        // --- Index Parser Functions ---
+
+        function openIndexParser() {
+            if (!currentPdf) return;
+            indexParserState.pdf = currentPdf;
+            indexParserState.totalPages = currentPdf.numPages;
+            indexParserState.currentPageNum = 1;
+            indexPageCount.textContent = indexParserState.totalPages;
+            indexPageNumInput.value = 1;
+            indexParserModal.classList.remove('hidden');
+            renderIndexPage(1);
+        }
+
+        function closeIndexParser() {
+            indexParserModal.classList.add('hidden');
+            // Clear canvas to free memory
+            indexParserCanvas.width = 0;
+            indexParserCanvas.height = 0;
+            selectionBox.style.display = 'none';
+            parseSelectionBtn.disabled = true;
+        }
+
+        async function renderIndexPage(pageNum) {
+            setLoading(true, `Loading page ${pageNum}...`);
+            try {
+                const page = await indexParserState.pdf.getPage(pageNum);
+                indexParserState.currentRenderedPage = page;
+                
+                const wrapperWidth = indexCanvasWrapper.clientWidth - 40; // Subtract padding
+                const unscaledViewport = page.getViewport({ scale: 1.0 });
+                const scale = wrapperWidth / unscaledViewport.width;
+                const viewport = page.getViewport({ scale: scale });
+                indexParserState.currentViewport = viewport;
+
+                const context = indexParserCanvas.getContext('2d');
+                indexParserCanvas.height = viewport.height;
+                indexParserCanvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+            } catch (error) {
+                console.error(`Failed to render page ${pageNum}:`, error);
+                showNotification(`Could not render page ${pageNum}.`, 'error');
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        function changeIndexPage(delta) {
+            let newPageNum = indexParserState.currentPageNum + delta;
+            if (newPageNum > 0 && newPageNum <= indexParserState.totalPages) {
+                indexParserState.currentPageNum = newPageNum;
+                indexPageNumInput.value = newPageNum;
+                renderIndexPage(newPageNum);
+            }
+        }
+
+        function goToIndexPage() {
+            let newPageNum = parseInt(indexPageNumInput.value, 10);
+            if (!isNaN(newPageNum) && newPageNum > 0 && newPageNum <= indexParserState.totalPages) {
+                indexParserState.currentPageNum = newPageNum;
+                renderIndexPage(newPageNum);
+            } else {
+                indexPageNumInput.value = indexParserState.currentPageNum; // Reset to valid
+            }
+        }
+
+        function handleSelectionStart(e) {
+            indexParserState.isSelecting = true;
+            indexParserState.selectionStart.x = e.offsetX;
+            indexParserState.selectionStart.y = e.offsetY;
+            selectionBox.style.left = `${e.offsetX}px`;
+            selectionBox.style.top = `${e.offsetY}px`;
+            selectionBox.style.width = '0px';
+            selectionBox.style.height = '0px';
+            selectionBox.style.display = 'block';
+            parseSelectionBtn.disabled = true;
+        }
+
+        function handleSelectionMove(e) {
+            if (!indexParserState.isSelecting) return;
+            const currentX = e.offsetX;
+            const currentY = e.offsetY;
+
+            const x = Math.min(currentX, indexParserState.selectionStart.x);
+            const y = Math.min(currentY, indexParserState.selectionStart.y);
+            const width = Math.abs(currentX - indexParserState.selectionStart.x);
+            const height = Math.abs(currentY - indexParserState.selectionStart.y);
+
+            selectionBox.style.left = `${x}px`;
+            selectionBox.style.top = `${y}px`;
+            selectionBox.style.width = `${width}px`;
+            selectionBox.style.height = `${height}px`;
+        }
+
+        function handleSelectionEnd(e) {
+            indexParserState.isSelecting = false;
+            const finalWidth = parseFloat(selectionBox.style.width);
+            const finalHeight = parseFloat(selectionBox.style.height);
+            if (finalWidth > 5 && finalHeight > 5) {
+                parseSelectionBtn.disabled = false;
+            } else {
+                selectionBox.style.display = 'none';
+            }
+        }
+        
+        async function findIndexPages(terms, pageToExclude) {
+            if (!currentPdf || terms.length === 0) {
+                return [];
+            }
+
+            const foundIndexData = [];
+            const termsToFind = new Map(terms.map(term => [term.toLowerCase().replace(/\s+/g, ''), term]));
+
+            for (let i = 1; i <= currentPdf.numPages; i++) {
+                if (i === pageToExclude) {
+                    continue; // Skip the page that was parsed
+                }
+
+                if (termsToFind.size === 0) {
+                    console.log("All index terms found, stopping search early.");
+                    break;
+                }
+
+                setLoading(true, `Scanning for index terms on page ${i} of ${currentPdf.numPages}...`);
+
+                const page = await currentPdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join('').toLowerCase().replace(/\s+/g, '');
+
+                for (const searchTerm of [...termsToFind.keys()]) {
+                    if (pageText.includes(searchTerm)) {
+                        const originalTerm = termsToFind.get(searchTerm);
+                        foundIndexData.push({ description: originalTerm, pageNum: i });
+                        termsToFind.delete(searchTerm);
+                    }
+                }
+            }
+
+            if (termsToFind.size > 0) {
+                showNotification(`${termsToFind.size} index terms could not be found in the document.`, 'error');
+                console.log("Unfound terms:", [...termsToFind.values()]);
+            }
+
+            foundIndexData.sort((a, b) => terms.indexOf(a.description) - terms.indexOf(b.description));
+
+            return foundIndexData;
+        }
+
+        async function parseSelectedText() {
+            setLoading(true, "Parsing selection...");
+            try {
+                const page = indexParserState.currentRenderedPage;
+                const viewport = indexParserState.currentViewport;
+                if (!page || !viewport) {
+                    throw new Error("No page or viewport available for parsing.");
+                }
+                
+                const pageToExclude = page.pageNumber;
+                
+                const rect = {
+                    x: parseFloat(selectionBox.style.left),
+                    y: parseFloat(selectionBox.style.top),
+                    width: parseFloat(selectionBox.style.width),
+                    height: parseFloat(selectionBox.style.height)
+                };
+
+                const startPoint = viewport.convertToPdfPoint(rect.x, rect.y + rect.height);
+                const endPoint = viewport.convertToPdfPoint(rect.x + rect.width, rect.y);
+                const pdfRect = { x1: startPoint[0], y1: startPoint[1], x2: endPoint[0], y2: endPoint[1] };
+
+                const textContent = await page.getTextContent();
+                const itemsInBox = textContent.items.filter(item => {
+                    const tx = item.transform;
+                    const x = tx[4];
+                    const y = tx[5];
+                    return x >= pdfRect.x1 && x <= pdfRect.x2 && y >= pdfRect.y1 && y <= pdfRect.y2;
+                });
+
+                itemsInBox.sort((a, b) => {
+                    const y1 = a.transform[5];
+                    const y2 = b.transform[5];
+                    if (Math.abs(y1 - y2) > 2) { 
+                        return y2 - y1;
+                    }
+                    return a.transform[4] - b.transform[4];
+                });
+
+                let lines = [];
+                if (itemsInBox.length > 0) {
+                    let currentLine = [itemsInBox[0]];
+                    for (let i = 1; i < itemsInBox.length; i++) {
+                        if (Math.abs(itemsInBox[i].transform[5] - itemsInBox[i-1].transform[5]) > 2) {
+                            lines.push(currentLine.map(i => i.str).join(' '));
+                            currentLine = [itemsInBox[i]];
+                        } else {
+                            currentLine.push(itemsInBox[i]);
+                        }
+                    }
+                    lines.push(currentLine.map(i => i.str).join(' '));
+                }
+                
+                const searchTermsFromIndex = lines.map(line => line.trim().replace(/\s+/g, ' ')).filter(line => line.length > 2);
+
+                if (searchTermsFromIndex.length === 0) {
+                    showNotification("No text found in the selection to use as search terms.", "error");
+                    closeIndexParser();
+                    return;
+                }
+                
+                closeIndexParser();
+
+                const parsedIndexData = await findIndexPages(searchTermsFromIndex, pageToExclude);
+
+                if (parsedIndexData.length > 0) {
+                    renderParsedIndex(parsedIndexData);
+                    showNotification(`${parsedIndexData.length} index items found in the document.`, 'success');
+                } else {
+                    showNotification("Could not find any of the selected index items in the document.", "error");
+                }
+
+            } catch(error) {
+                console.error("Error parsing selected text:", error);
+                showNotification("Could not parse text from selection.", "error");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function renderParsedIndex(indexData) {
+            parsedIndexOutput.innerHTML = ''; 
+
+            if (indexData.length === 0) {
+                parsedIndexOutput.innerHTML = '<p class="text-slate-500">No index data to display.</p>';
+                parsedIndexContainer.classList.add('hidden');
+                return;
+            }
+
+            indexData.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-2 rounded-md hover:bg-slate-100 flex items-center';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `index-item-${index}`;
+                checkbox.className = 'mr-3 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500';
+                checkbox.dataset.pageNum = item.pageNum;
+
+                const label = document.createElement('label');
+                label.htmlFor = `index-item-${index}`;
+                label.className = 'flex-grow cursor-pointer';
+                label.textContent = item.description;
+
+                const pageNumSpan = document.createElement('span');
+                pageNumSpan.className = 'ml-4 font-mono text-sm text-slate-500 bg-slate-200 px-2 py-1 rounded';
+                pageNumSpan.textContent = `Pg. ${item.pageNum}`;
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                div.appendChild(pageNumSpan);
+                parsedIndexOutput.appendChild(div);
+            });
+
+            parsedIndexContainer.classList.remove('hidden');
+        }
+
+        async function addSelectedIndexPages() {
+            const checkedBoxes = document.querySelectorAll('#parsed-index-output input[type="checkbox"]:checked');
+
+            if (checkedBoxes.length === 0) {
+                showNotification("No index items selected.", "error");
+                return;
+            }
+
+            setLoading(true, "Adding selected pages...");
+            const pagesToAdd = new Set(matchedPageNumbers);
+            checkedBoxes.forEach(box => {
+                const pageNum = parseInt(box.dataset.pageNum, 10);
+                if (!isNaN(pageNum)) {
+                    pagesToAdd.add(pageNum);
+                }
+            });
+
+            matchedPageNumbers = Array.from(pagesToAdd).sort((a, b) => a - b);
+
+            await rerenderAllResults();
+            updateResultsSummary();
+            setLoading(false);
+            showNotification(`${checkedBoxes.length} page(s) added to results.`, "success");
+        }
+
+
         // --- Utility Functions (UI Helpers) ---
         function setLoading(isLoading, text = "Loading...") {
             loadingText.textContent = text;
@@ -614,7 +992,6 @@
 
         // --- Magnifier Functions ---
         function handleMouseLeave(event) {
-            // Find and remove the popover if it exists.
             const popover = document.getElementById('magnifier-popover');
             if (popover) {
                 popover.remove();
@@ -622,70 +999,44 @@
         }
         
         async function handleMouseEnter(event) {
-            // 1. Get the page number we stored in the dataset
             const pageNum = parseInt(event.currentTarget.dataset.pageNumber, 10);
             if (!currentPdf || !pageNum) return;
-        
-            // Remove any old popover just in case
             handleMouseLeave();
-        
-            // 2. Create the popover container
             const popover = document.createElement('div');
             popover.id = 'magnifier-popover';
-            
-            // Create a temporary loading message
             const loadingMessage = document.createElement('p');
             loadingMessage.textContent = 'Loading...';
             loadingMessage.className = 'p-4';
             popover.appendChild(loadingMessage);
-            
-            // 3. Position the popover initially
             positionPopover(event, popover);
-            
-            // Add to the page
             document.body.appendChild(popover);
-            
-            // 4. Get the PDF page and render it at a higher resolution
             const page = await currentPdf.getPage(pageNum);
-            
-            const magnifiedWidth = 500; // pixels
+            const magnifiedWidth = 500;
             const unscaledViewport = page.getViewport({ scale: 1.0 });
             const scale = magnifiedWidth / unscaledViewport.width;
             const viewport = page.getViewport({ scale: scale });
-        
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
             canvas.height = viewport.height;
             canvas.width = viewport.width;
-        
-            // 5. Render the page, then swap the loading message for the canvas
             await page.render({ canvasContext: context, viewport: viewport }).promise;
-        
-            popover.innerHTML = ''; // Clear the "Loading..." text
-            popover.appendChild(canvas); // Add the high-res canvas
-        
-            // 6. Final re-positioning
+            popover.innerHTML = '';
+            popover.appendChild(canvas);
             positionPopover(event, popover);
         }
         
-        // UTILITY FUNCTION FOR POSITIONING
         function positionPopover(mouseEvent, popoverElement) {
             const popoverRect = popoverElement.getBoundingClientRect();
             const offsetX = 15;
             const offsetY = 15;
-        
             let top = mouseEvent.clientY + offsetY;
             let left = mouseEvent.clientX + offsetX;
-        
-            // Prevent popover from going off the right edge of the screen
             if (left + popoverRect.width > window.innerWidth) {
                 left = mouseEvent.clientX - popoverRect.width - offsetX;
             }
-            // Prevent popover from going off the bottom edge
             if (top + popoverRect.height > window.innerHeight) {
                 top = mouseEvent.clientY - popoverRect.height - offsetY;
             }
-        
             popoverElement.style.top = `${top}px`;
             popoverElement.style.left = `${left}px`;
         }
@@ -702,6 +1053,20 @@
             addPageBtn.addEventListener('click', handleAddSinglePage);
             runSearchBtn.addEventListener('click', runSearch);
             openPdfBtn.addEventListener('click', openFilteredPdfInNewTab);
+            addSelectedIndexBtn.addEventListener('click', addSelectedIndexPages);
+
+            // Index Parser Event Listeners
+            parseIndexBtn.addEventListener('click', openIndexParser);
+            cancelIndexParserBtn.addEventListener('click', closeIndexParser);
+            indexPrevPageBtn.addEventListener('click', () => changeIndexPage(-1));
+            indexNextPageBtn.addEventListener('click', () => changeIndexPage(1));
+            indexPageNumInput.addEventListener('change', goToIndexPage);
+            parseSelectionBtn.addEventListener('click', parseSelectedText);
+            
+            // Selection listeners
+            indexParserCanvas.parentElement.addEventListener('mousedown', handleSelectionStart);
+            indexParserCanvas.parentElement.addEventListener('mousemove', handleSelectionMove);
+            indexParserCanvas.parentElement.addEventListener('mouseup', handleSelectionEnd);
 
             initializeFirebase();
         }
